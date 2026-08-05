@@ -83,7 +83,7 @@ def _copy_repo_sessions():
         except Exception:
             items = []
         for fname in items:
-            if fname.endswith(".session"):
+            if fname.endswith(".session") and fname not in ("controller_bot.session", "auto_poster_session.session"):
                 src = os.path.join(src_dir, fname)
                 dst = os.path.join(SESSIONS_DIR, fname)
                 try:
@@ -250,12 +250,8 @@ current_msg_index = 0
 def get_active_user_sessions():
     sessions = []
     for s in os.listdir(SESSIONS_DIR):
-        if s.endswith(".session"):
+        if s.endswith(".session") and s not in ("controller_bot.session", "auto_poster_session.session"):
             sessions.append(os.path.join(SESSIONS_DIR, s))
-    if not sessions:
-        old_session = os.path.join(BASE_DIR, "auto_poster_session.session")
-        if os.path.exists(old_session):
-            sessions.append(old_session)
     return sessions
 
 def extract_telegram_links(text):
@@ -381,13 +377,14 @@ async def auto_poster_loop(bot_client, chat_id):
                     await cl.disconnect()
                     return session_path, set()
                 d_ids = set()
-                async for d in cl.iter_dialogs(limit=1000):
+                async for d in cl.iter_dialogs():
                     if d.is_group or d.is_channel:
                         d_ids.add(d.id)
                 await cl.disconnect()
                 global_acc_dialogs_cache[session_path] = d_ids
                 return session_path, d_ids
-            except Exception:
+            except Exception as e:
+                print(f"Error fetching dialogs for {session_path}: {e}")
                 return session_path, set()
 
         try:
