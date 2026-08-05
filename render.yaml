@@ -1,0 +1,9 @@
+services:
+  - type: web_service
+    name: nomerchi-auto-poster
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install --prefer-binary -r requirements.txt
+    startCommand: python bot.py
+    healthCheckPath: /
