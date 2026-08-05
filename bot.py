@@ -320,9 +320,12 @@ def build_chat_toggle_keyboard(cfg, page=0):
     buttons.append([Button.inline("⬅️ Orqaga", data="manage_chats")])
     return buttons
 
+# Global dialog cache for speed
+global_acc_dialogs_cache = {}
+
 # ── Main Poster Loop Task (PARALLEL - barcha akkauntlar bir vaqtda) ──
 async def auto_poster_loop(bot_client, chat_id):
-    global is_posting_active, current_msg_index
+    global is_posting_active, current_msg_index, global_acc_dialogs_cache
     round_num = 0
 
     while is_posting_active:
@@ -341,19 +344,19 @@ async def auto_poster_loop(bot_client, chat_id):
         delay_sec = cfg.get("delay_between_chats", 3)
 
         if not targets:
-            await bot_client.send_message(chat_id, "⚠️ **Xatolik:** Guruhlar tanlanmagan! Chatlar boshqaruvidan guruh qo'shing.")
-            is_posting_active = False
-            break
+            await bot_client.send_message(chat_id, "⚠️ **Diqqat:** Guruhlar ro'yxati bo'sh! Guruh qo'shishingizni kutyapman...")
+            await asyncio.sleep(30)
+            continue
         if not msgs:
-            await bot_client.send_message(chat_id, "⚠️ **Xatolik:** Xabar matni kiritilmagan!")
-            is_posting_active = False
-            break
+            await bot_client.send_message(chat_id, "⚠️ **Diqqat:** Xabar matni kiritilmagan! Kutyapman...")
+            await asyncio.sleep(30)
+            continue
 
         sessions = get_active_user_sessions()
         if not sessions:
-            await bot_client.send_message(chat_id, "⚠️ **Xatolik:** Akkaunt ulangan emas!")
-            is_posting_active = False
-            break
+            await bot_client.send_message(chat_id, "⚠️ **Diqqat:** Akkaunt ulangan emas! Kutyapman...")
+            await asyncio.sleep(30)
+            continue
 
         active_message = msgs[current_msg_index % len(msgs)]
         current_msg_index += 1
@@ -369,6 +372,8 @@ async def auto_poster_loop(bot_client, chat_id):
 
         # 1. Fetch which dialogs each account has
         async def get_acc_dialogs(session_path):
+            if session_path in global_acc_dialogs_cache:
+                return session_path, global_acc_dialogs_cache[session_path]
             try:
                 cl = TelegramClient(session_path, cfg["api_id"], cfg["api_hash"])
                 await cl.connect()
@@ -376,16 +381,21 @@ async def auto_poster_loop(bot_client, chat_id):
                     await cl.disconnect()
                     return session_path, set()
                 d_ids = set()
-                async for d in cl.iter_dialogs():
+                async for d in cl.iter_dialogs(limit=1000):
                     if d.is_group or d.is_channel:
                         d_ids.add(d.id)
                 await cl.disconnect()
+                global_acc_dialogs_cache[session_path] = d_ids
                 return session_path, d_ids
             except Exception:
                 return session_path, set()
 
-        dialog_results = await asyncio.gather(*[get_acc_dialogs(s) for s in sessions])
-        acc_dialogs = dict(dialog_results)
+        try:
+            dialog_results = await asyncio.gather(*[get_acc_dialogs(s) for s in sessions], return_exceptions=True)
+            acc_dialogs = {r[0]: r[1] for r in dialog_results if isinstance(r, tuple)}
+        except Exception as e:
+            print("Dialog fetch error:", e)
+            acc_dialogs = {s: set() for s in sessions}
 
         # 2. Assign targets to ALL accounts that are actually members
         acc_assigned_targets = {s: [] for s in sessions}
@@ -539,6 +549,7 @@ async def main():
         if data == "toggle_posting":
             if is_posting_active:
                 is_posting_active = False
+                global_acc_dialogs_cache.clear() # Clear cache on stop
                 if posting_task:
                     posting_task.cancel()
                 await event.answer("🛑 Avto-posting to'xtatildi!", alert=True)
