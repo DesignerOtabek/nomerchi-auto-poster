@@ -169,6 +169,20 @@ def load_config():
                 return json.load(f)
         except Exception:
             pass
+            
+    # Try to restore from Render Env
+    env_config = os.environ.get("BOT_CONFIG")
+    if env_config:
+        try:
+            cfg = json.loads(base64.b64decode(env_config).decode("utf-8"))
+            # Save it locally for next reads
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, ensure_ascii=False, indent=2)
+            print("[CONFIG] Restored from Render environment!", flush=True)
+            return cfg
+        except Exception as e:
+            print(f"[CONFIG] Failed to decode env config: {e}", flush=True)
+
     return {
         "api_id": 36765468,
         "api_hash": "fef302fe2a86e2718a15a05f970edce3",
@@ -185,9 +199,44 @@ def load_config():
         "multi_acc_rotation": True
     }
 
+def _save_config_to_env(config):
+    render_key = os.environ.get("RENDER_API_KEY", "")
+    service_id = os.environ.get("RENDER_SERVICE_ID", "")
+    if not render_key or not service_id:
+        return
+    try:
+        import urllib.request as _ur
+        b64 = base64.b64encode(json.dumps(config).encode("utf-8")).decode()
+        
+        req = _ur.Request(
+            f"https://api.render.com/v1/services/{service_id}/env-vars",
+            headers={"Authorization": f"Bearer {render_key}"}
+        )
+        resp = json.loads(_ur.urlopen(req, timeout=10).read())
+        current = {v.get("envVar", {}).get("key", ""): v.get("envVar", {}).get("value", "") for v in resp}
+        
+        if current.get("BOT_CONFIG") == b64:
+            return # No change needed
+            
+        current["BOT_CONFIG"] = b64
+        payload = json.dumps([{"key": k, "value": v} for k, v in current.items() if k]).encode()
+        
+        req2 = _ur.Request(
+            f"https://api.render.com/v1/services/{service_id}/env-vars",
+            data=payload,
+            headers={"Authorization": f"Bearer {render_key}", "Content-Type": "application/json"},
+            method="PUT"
+        )
+        _ur.urlopen(req2, timeout=15)
+        print("[CONFIG] Saved to Render environment!", flush=True)
+    except Exception as e:
+        print(f"[CONFIG] Env save error: {e}", flush=True)
+
 def save_config(config):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
+    # Background save to Render Env so it doesn't block Telegram events
+    threading.Thread(target=_save_config_to_env, args=(config,), daemon=True).start()
 
 config = load_config()
 
