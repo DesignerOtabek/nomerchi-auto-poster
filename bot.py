@@ -64,8 +64,102 @@ threading.Thread(target=self_ping_loop, daemon=True).start()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
-SESSIONS_DIR = os.path.join(BASE_DIR, "sessions")
+
+# Use /tmp/sessions on Linux (Render) — always writable
+SESSIONS_DIR = "/tmp/sessions" if os.name == "posix" else os.path.join(BASE_DIR, "sessions")
 os.makedirs(SESSIONS_DIR, exist_ok=True)
+
+# ── Session Persistence (Render free tier) ─────────
+import shutil, base64
+
+def _copy_repo_sessions():
+    """Copy bundled session files from repo to /tmp/sessions at startup."""
+    repo_sessions = os.path.join(BASE_DIR, "sessions")
+    for src_dir in [repo_sessions, BASE_DIR]:
+        if not os.path.isdir(src_dir) and src_dir == BASE_DIR:
+            continue
+        try:
+            items = os.listdir(src_dir) if os.path.isdir(src_dir) else []
+        except Exception:
+            items = []
+        for fname in items:
+            if fname.endswith(".session"):
+                src = os.path.join(src_dir, fname)
+                dst = os.path.join(SESSIONS_DIR, fname)
+                try:
+                    if not os.path.exists(dst):
+                        shutil.copy2(src, dst)
+                        print(f"[SESSION] Copied from repo: {fname}", flush=True)
+                except Exception as e:
+                    print(f"[SESSION] Copy error: {e}", flush=True)
+
+def _restore_sessions_from_env():
+    """Restore sessions from Render env vars SESSION_1..SESSION_10."""
+    for i in range(1, 11):
+        b64 = os.environ.get(f"SESSION_{i}", "")
+        name = os.environ.get(f"SESSION_NAME_{i}", "")
+        if b64 and name:
+            try:
+                data = base64.b64decode(b64)
+                path = os.path.join(SESSIONS_DIR, name)
+                with open(path, "wb") as f:
+                    f.write(data)
+                print(f"[SESSION] Restored from env: {name}", flush=True)
+            except Exception as e:
+                print(f"[SESSION] Restore error {name}: {e}", flush=True)
+
+def save_session_to_env(phone):
+    """Save session file to Render env var for persistence across restarts."""
+    session_path = os.path.join(SESSIONS_DIR, f"{phone}.session")
+    render_key = os.environ.get("RENDER_API_KEY", "")
+    service_id = os.environ.get("RENDER_SERVICE_ID", "")
+    if not render_key or not service_id or not os.path.exists(session_path):
+        return
+    try:
+        import urllib.request as _ur
+        with open(session_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        fname = f"{phone}.session"
+
+        # Get current env vars
+        req = _ur.Request(
+            f"https://api.render.com/v1/services/{service_id}/env-vars",
+            headers={"Authorization": f"Bearer {render_key}"}
+        )
+        resp = json.loads(_ur.urlopen(req, timeout=10).read())
+        current = {v.get("envVar", {}).get("key", ""): v.get("envVar", {}).get("value", "") for v in resp}
+
+        # Find slot for this phone
+        slot = None
+        for i in range(1, 11):
+            if current.get(f"SESSION_NAME_{i}", "") == fname:
+                slot = i
+                break
+        if slot is None:
+            for i in range(1, 11):
+                if not current.get(f"SESSION_NAME_{i}", ""):
+                    slot = i
+                    break
+        if slot is None:
+            print("[SESSION] No free slot (max 10 accounts)", flush=True)
+            return
+
+        current[f"SESSION_{slot}"] = b64
+        current[f"SESSION_NAME_{slot}"] = fname
+        payload = json.dumps([{"key": k, "value": v} for k, v in current.items() if k]).encode()
+        req2 = _ur.Request(
+            f"https://api.render.com/v1/services/{service_id}/env-vars",
+            data=payload,
+            headers={"Authorization": f"Bearer {render_key}", "Content-Type": "application/json"},
+            method="PUT"
+        )
+        _ur.urlopen(req2, timeout=15)
+        print(f"[SESSION] Saved to Render env SESSION_{slot}: {fname}", flush=True)
+    except Exception as e:
+        print(f"[SESSION] Env save error: {e}", flush=True)
+
+_copy_repo_sessions()
+_restore_sessions_from_env()
 
 # ── Configuration Manager ──────────────────────
 def load_config():
@@ -700,7 +794,9 @@ async def main():
                 me = await temp_client.get_me()
                 await temp_client.disconnect()
                 user_states[user_id] = None
-                await event.respond(f"🎉 **Muvaffaqiyatli ulandi:** {me.first_name} (@{me.username or me.id})!", buttons=get_main_keyboard())
+                save_session_to_env(phone)
+                sessions_count = len(get_active_user_sessions())
+                await event.respond(f"🎉 **Muvaffaqiyatli ulandi:** {me.first_name} (@{me.username or me.id})!\n\n📱 Jami ulangan akkauntlar: {sessions_count} ta", buttons=get_main_keyboard())
             except SessionPasswordNeededError:
                 cfg["pending_code"] = code
                 save_config(cfg)
@@ -724,7 +820,9 @@ async def main():
                 me = await temp_client.get_me()
                 await temp_client.disconnect()
                 user_states[user_id] = None
-                await event.respond(f"🎉 **2FA Parol qabul qilindi! Muvaffaqiyatli ulandi:** {me.first_name} (@{me.username or me.id})!", buttons=get_main_keyboard())
+                save_session_to_env(phone)
+                sessions_count = len(get_active_user_sessions())
+                await event.respond(f"🎉 **2FA Parol qabul qilindi! Muvaffaqiyatli ulandi:** {me.first_name} (@{me.username or me.id})!\n\n📱 Jami ulangan akkauntlar: {sessions_count} ta", buttons=get_main_keyboard())
             except Exception as ex:
                 await temp_client.disconnect()
                 await event.respond(f"❌ 2FA Parolda xatolik: {ex}. Qayta kiriting:")
