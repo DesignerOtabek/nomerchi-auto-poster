@@ -886,43 +886,87 @@ async def main():
                 await event.respond("⚠️ Avval Telegram akkaunt ulang!")
                 return
 
-            user_client = TelegramClient(sessions[0], cfg["api_id"], cfg["api_hash"])
-            await user_client.connect()
+            joined_chats = {}
+            report_msg = "📊 **AVTO-OBUNA NATIJALARI:**\n\n"
 
-            joined_chats = []
-
-            for inv in invites:
-                try:
-                    res = await user_client(ImportChatInviteRequest(inv))
-                    ch = res.chats[0]
-                    joined_chats.append({"id": ch.id, "title": ch.title})
-                except UserAlreadyParticipantError:
+            for s in sessions:
+                sess_name = os.path.basename(s).replace(".session", "")
+                
+                cl = global_active_clients.get(s)
+                created_new = False
+                if not cl:
+                    cl = TelegramClient(s, cfg["api_id"], cfg["api_hash"])
                     try:
-                        ci = await user_client.get_entity(f"https://t.me/+{inv}")
-                        joined_chats.append({"id": ci.id, "title": ci.title})
-                    except Exception: pass
-                except Exception: pass
-                await asyncio.sleep(2)
+                        await cl.connect()
+                        created_new = True
+                    except Exception as e:
+                        report_msg += f"❌ `{sess_name}` ulanolmadi: {str(e)[:30]}\n"
+                        continue
 
-            for pub in publics:
                 try:
-                    res = await user_client(JoinChannelRequest(pub))
-                    ch = res.chats[0]
-                    joined_chats.append({"id": ch.id, "title": ch.title})
-                except UserAlreadyParticipantError:
-                    try:
-                        ci = await user_client.get_entity(pub)
-                        joined_chats.append({"id": ci.id, "title": getattr(ci, 'title', pub)})
-                    except Exception: pass
-                except Exception: pass
-                await asyncio.sleep(2)
+                    if not await cl.is_user_authorized():
+                        report_msg += f"❌ `{sess_name}` avtorizatsiyadan o'tmagan\n"
+                        continue
+                except Exception:
+                    report_msg += f"❌ `{sess_name}` avtorizatsiyani tekshirib bo'lmadi\n"
+                    continue
 
-            await user_client.disconnect()
+                succ_count = 0
+                for inv in invites:
+                    try:
+                        res = await cl(ImportChatInviteRequest(inv))
+                        ch = res.chats[0]
+                        joined_chats[ch.id] = ch.title
+                        succ_count += 1
+                    except UserAlreadyParticipantError:
+                        try:
+                            ci = await cl.get_entity(f"https://t.me/+{inv}")
+                            joined_chats[ci.id] = getattr(ci, 'title', 'Guruh')
+                            succ_count += 1
+                        except Exception: pass
+                    except Exception as e:
+                        pass
+                    await asyncio.sleep(1)
+
+                for pub in publics:
+                    try:
+                        res = await cl(JoinChannelRequest(pub))
+                        ch = res.chats[0]
+                        joined_chats[ch.id] = ch.title
+                        succ_count += 1
+                    except UserAlreadyParticipantError:
+                        try:
+                            ci = await cl.get_entity(pub)
+                            joined_chats[ci.id] = getattr(ci, 'title', pub)
+                            succ_count += 1
+                        except Exception: pass
+                    except Exception as e:
+                        if "A wait of" in str(e) or "BANNED" in str(e).upper() or "RESTRICTED" in str(e).upper():
+                            report_msg += f"⚠️ `{sess_name}` spam yoki cheklovda!\n"
+                    await asyncio.sleep(1)
+
+                if created_new:
+                    try: await cl.disconnect()
+                    except Exception: pass
+
+                report_msg += f"👤 `{sess_name}`: ✅ {succ_count} ta guruhga kirdi.\n"
 
             if joined_chats:
                 cur_targets = cfg.get("targets", [])
                 ex_ids = {t["id"] for t in cur_targets}
                 added_cnt = 0
+                for jid, jtitle in joined_chats.items():
+                    if jid not in ex_ids:
+                        cur_targets.append({"id": jid, "title": jtitle})
+                        ex_ids.add(jid)
+                        added_cnt += 1
+                cfg["targets"] = cur_targets
+                save_config(cfg)
+                report_msg += f"\n🎯 **Jami {added_cnt} ta yangi guruh baza (targets) ga saqlandi!**"
+            else:
+                report_msg += "\n⚠️ Hech qanday yangi guruhga kirib bo'lmadi yoki hamma guruhlarga allaqachon a'zosiz."
+
+            await event.respond(report_msg, buttons=get_main_keyboard())        added_cnt = 0
                 for jc in joined_chats:
                     if jc["id"] not in ex_ids:
                         cur_targets.append(jc)
