@@ -1,0 +1,194 @@
+{
+  "api_id": 36765468,
+  "api_hash": "fef302fe2a86e2718a15a05f970edce3",
+  "bot_token": "8715724185:AAFMlUMkhtQ7fGN7WyRSpJJmgs0b-HzaZNc",
+  "phone": "+79111261990",
+  "message": "**Profilda gurpa bor oʻtib olila **❤️",
+  "interval_minutes": 5,
+  "delay_between_chats": 5,
+  "targets": [
+    {
+      "id": -1004358335958,
+      "title": "🍒𝐒𝐄𝐕𝐆𝐈 𝐕𝐀 𝐃𝐎𝐒𝐓𝐋𝐈𝐊 🍒"
+    },
+    {
+      "id": -1001355310038,
+      "title": "BUXORO NAVOIY QARSHI BEVALAR"
+    },
+    {
+      "id": -1001315780431,
+      "title": "🌸Sevgi va doʻstlik🌸begʻuborim"
+    },
+    {
+      "id": -1001778492706,
+      "title": "♥️🍒𝐒𝐄𝐕𝐆𝐈 𝐕𝐀 𝐃𝐎𝐒𝐓𝐋𝐈𝐊 🍒♥️ TANISHUVLAR"
+    },
+    {
+      "id": -1003927153493,
+      "title": "2011 🌸 2012 👑 2013"
+    }
+  ],
+  "admin_id": 8804278769,
+  "interval_seconds": 8,
+  "pending_phone": "+79111261990",
+  "phone_code_hash": "0b6d6f56f90d6a4364",
+  "pending_code": "89846",
+  "messages": [
+    "**❤️‍🔥 Profildagi guruhimizga o‘ting, yozishamiz ❤️‍🔥**",
+    "**Profilda gurpa bor oʻtib olila **❤️"
+  ],
+  "all_dialogs": [
+    {
+      "id": -1001870106750,
+      "title": "ЖИЗЗАХ ТОШКЕНТ TAKSI"
+    },
+    {
+      "id": -1003927153493,
+      "title": "2011 🌸 2012 👑 2013"
+    },
+    {
+      "id": -1001778492706,
+      "title": "♥️🍒𝐒𝐄𝐕𝐆𝐈 𝐕𝐀 𝐃𝐎𝐒𝐓𝐋𝐈𝐊 🍒♥️ TANISHUVLAR"
+    },
+    {
+      "id": -1001315780431,
+      "title": "🌸Sevgi va doʻstlik🌸begʻuborim"
+    },
+    {
+      "id": -1001355310038,
+      "title": "BUXORO NAVOIY QARSHI BEVALAR"
+    },
+    {
+      "id": -1004310821631,
+      "title": "🌸sevgi_va_dustlik🌸"
+    },
+    {
+      "id": -1004358335958,
+      "title": "🍒𝐒𝐄𝐕𝐆𝐈 𝐕𝐀 𝐃𝐎𝐒𝐓𝐋𝐈𝐊 🍒"
+    },
+    {
+      "id": -1003965503292,
+      "title": "Doʻstlar davrasi☝🏻"
+    },
+    {
+      "id": -1003921706966,
+      "title": "MAFIA"
+    },
+    {
+      "id": -1003708012228,
+      "title": "ФИЧА"
+    },
+    {
+      "id": -1001776061887,
+      "title": "Korean Drama"
+    },
+    {
+      "id": -1001928858823,
+      "title": "Tezlik va sevgi ❤️‍🔥"
+    },
+    {
+      "id": -1001909304109,
+      "title": "Falokat eshik qoqqan kun"
+    },
+    {
+      "id": -1002046753584,
+      "title": "Samoviy idol🎀"
+    },
+    {
+      "id": -1002199134604,
+      "title": "𝑺𝒆𝒐𝒖𝒍𝒍𝒂𝒏𝒅 🪐"
+    },
+    {
+      "id": -1002197039204,
+      "title": "Boʻsa olmaslik kerak edi ❤️‍🔥"
+    },
+    {
+      "id": -1002599239481,
+      "title": "Mening orzuyim sensan 🤍| Senga atalgan orzu"
+    },
+    {
+      "id": -1002516440586,
+      "title": "Menning Qirollik raqibim"
+    },
+    {
+      "id": -1002878790164,
+      "title": "𝘈𝘦𝘴𝘵𝘩𝘦𝘵𝘪𝘤 𝘱𝘪𝘤𝘵𝘶𝘳𝘦𝘴🦋"
+    },
+    {
+      "id": -1002738028950,
+      "title": "Siz kelajakdansiz.Mukammal toj Mo'jizakor telbalar"
+    },
+    {
+      "id": -1002719704526,
+      "title": "REYA TV 🎙️"
+    },
+    {
+      "id": -1002237175393,
+      "title": "Idub.tv dramalar"
+    },
+    {
+      "id": -1002376886786,
+      "title": "𝙀 𝙨𝙞𝙣𝙛𝙞𝙣𝙞𝙣𝙜 𝙢𝙖𝙧𝙫𝙖𝙧𝙞𝙙𝙞"
+    },
+    {
+      "id": -1003442676162,
+      "title": "Mening idolim🌸"
+    },
+    {
+      "id": -1003998070599,
+      "title": "الصبر🤍"
+    },
+    {
+      "id": -1001379954190,
+      "title": "ТЕЗКОР ЎЗБЕКИСТОН 🇺🇿"
+    },
+    {
+      "id": -1004450428682,
+      "title": "𝘽𝙚𝙠_𝙛𝙭 𝙩𝙧𝙖𝙙𝙚𝙧⚜️"
+    },
+    {
+      "id": -1004478446877,
+      "title": "⚜️ 𝗡𝗶𝗴𝗵𝘁 𝗪𝗼𝗹𝘃𝗲𝘀 𝗠𝗮𝗳𝗶𝗮 ⚜️"
+    },
+    {
+      "id": -1003996072685,
+      "title": "𝗪𝗲𝗻𝘇𝗼𝗻𝗲 🫀"
+    },
+    {
+      "id": -1004423876580,
+      "title": "Operativ Qizlar"
+    },
+    {
+      "id": -1004356877338,
+      "title": "12 TA VILOYATI HODIMLARI"
+    },
+    {
+      "id": -1002317867796,
+      "title": "Me Dinash"
+    },
+    {
+      "id": -1002631195972,
+      "title": "Uzpopka"
+    },
+    {
+      "id": -1002826247987,
+      "title": "MUSODARA BUYUMLAR"
+    },
+    {
+      "id": -1003247321930,
+      "title": "MUSODARA BUYUMLAR"
+    },
+    {
+      "id": -1004218608423,
+      "title": "Donat xizmatlari"
+    },
+    {
+      "id": -1002176636094,
+      "title": "𝗪𝗲𝗻𝘇𝗼𝗻𝗲 🫀"
+    },
+    {
+      "id": -1003273049175,
+      "title": "Manoli sherlar"
+    }
+  ]
+}
