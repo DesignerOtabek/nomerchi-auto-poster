@@ -192,7 +192,7 @@ def save_config(config):
 config = load_config()
 
 # Global States
-is_posting_active = False
+is_posting_active = config.get("auto_posting", True)
 posting_task = None
 user_states = {} # user_id -> state string
 current_msg_index = 0
@@ -457,6 +457,11 @@ async def main():
     print(f"🤖 Bot Nomi: {bot_me.first_name} (@{bot_me.username})")
     print("="*60 + "\n")
 
+    global posting_task
+    if is_posting_active and cfg.get("admin_id"):
+        print("🔄 Avto-posting avtomatik ravishda tiklandi...")
+        posting_task = asyncio.create_task(auto_poster_loop(bot, cfg["admin_id"]))
+
     # ── Command /start Handler ───────────────────
     @bot.on(events.NewMessage(pattern=r"^/start"))
     async def start_handler(event):
@@ -493,6 +498,8 @@ async def main():
                 posting_task = asyncio.create_task(auto_poster_loop(bot, event.chat_id))
                 await event.answer("🚀 Avto-posting ishga tushirildi!", alert=True)
 
+            cfg["auto_posting"] = is_posting_active
+            save_config(cfg)
             await event.edit(buttons=get_main_keyboard())
 
         elif data == "show_stats":
