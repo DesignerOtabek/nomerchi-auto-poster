@@ -310,20 +310,59 @@ async def auto_poster_loop(bot_client, chat_id):
         current_msg_index += 1
 
         n_sess = len(sessions)
-        # Distribute targets evenly among accounts (round-robin)
-        chunks = [targets[i::n_sess] for i in range(n_sess)]
-
+        
         now_time = datetime.now().strftime("%H:%M:%S")
         await bot_client.send_message(
             chat_id,
             f"🔄 **[{now_time}] #{round_num}-Raund Boshlandi**\n"
+            f"⏳ Akkauntlar guruhlari tekshirilmoqda..."
+        )
+
+        # 1. Fetch which dialogs each account has
+        async def get_acc_dialogs(session_path):
+            try:
+                cl = TelegramClient(session_path, cfg["api_id"], cfg["api_hash"])
+                await cl.connect()
+                if not await cl.is_user_authorized():
+                    await cl.disconnect()
+                    return session_path, set()
+                d_ids = set()
+                async for d in cl.iter_dialogs():
+                    if d.is_group or d.is_channel:
+                        d_ids.add(d.id)
+                await cl.disconnect()
+                return session_path, d_ids
+            except Exception:
+                return session_path, set()
+
+        dialog_results = await asyncio.gather(*[get_acc_dialogs(s) for s in sessions])
+        acc_dialogs = dict(dialog_results)
+
+        # 2. Assign targets to accounts that are actually members
+        acc_assigned_targets = {s: [] for s in sessions}
+        unreachable = 0
+        for tgt in targets:
+            possible_accs = [s for s in sessions if tgt["id"] in acc_dialogs[s]]
+            if possible_accs:
+                # Distribute evenly: pick the account with the minimum assigned targets so far
+                best_acc = min(possible_accs, key=lambda s: len(acc_assigned_targets[s]))
+                acc_assigned_targets[best_acc].append(tgt)
+            else:
+                unreachable += 1
+
+        unreach_msg = f"\n⚠️ **{unreachable} ta guruhga** hech qaysi akkaunt a'zo emas!" if unreachable else ""
+        await bot_client.send_message(
+            chat_id,
             f"👥 **{n_sess} ta akkaunt** parallel ishlaydi\n"
-            f"📊 Jami **{len(targets)} ta** guruhga yuboriladi"
+            f"📊 Jami **{len(targets)} ta** guruhdan **{len(targets) - unreachable} tasiga** yuboriladi{unreach_msg}"
         )
 
         async def session_task(session_path, my_targets):
             sess_name = os.path.basename(session_path).replace(".session", "")
             succ = fail = 0
+            if not my_targets:
+                return sess_name, 0, 0
+                
             try:
                 cl = TelegramClient(session_path, cfg["api_id"], cfg["api_hash"])
                 connected = False
@@ -367,9 +406,9 @@ async def auto_poster_loop(bot_client, chat_id):
             except Exception as ex:
                 return sess_name, succ, fail
 
-        # Run ALL accounts simultaneously
+        # Run ALL accounts simultaneously with their assigned targets
         results = await asyncio.gather(
-            *[session_task(sessions[i], chunks[i]) for i in range(n_sess)],
+            *[session_task(s, acc_assigned_targets[s]) for s in sessions],
             return_exceptions=True
         )
 
