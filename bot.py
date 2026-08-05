@@ -458,7 +458,6 @@ async def auto_poster_loop(bot_client, chat_id):
                         fail += 1
                     await asyncio.sleep(delay_sec)
 
-                await cl.disconnect()
                 return display, succ, fail
             except Exception as ex:
                 return sess_name, succ, fail
