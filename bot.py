@@ -45,7 +45,22 @@ def start_health_server():
     except Exception:
         pass
 
+def self_ping_loop():
+    """Ping own URL every 13 min to keep Render free tier awake."""
+    import urllib.request
+    time.sleep(60)  # Wait 1 min before first ping
+    url = "https://nomerchi-auto-poster.onrender.com/"
+    while True:
+        try:
+            urllib.request.urlopen(url, timeout=15)
+            print("[PING] Self-ping OK - staying alive!", flush=True)
+        except Exception as e:
+            print(f"[PING] {e}", flush=True)
+        time.sleep(13 * 60)  # 13 minutes
+
 threading.Thread(target=start_health_server, daemon=True).start()
+threading.Thread(target=self_ping_loop, daemon=True).start()
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
