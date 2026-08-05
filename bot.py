@@ -966,17 +966,8 @@ async def main():
             else:
                 report_msg += "\n⚠️ Hech qanday yangi guruhga kirib bo'lmadi yoki hamma guruhlarga allaqachon a'zosiz."
 
-            await event.respond(report_msg, buttons=get_main_keyboard())        added_cnt = 0
-                for jc in joined_chats:
-                    if jc["id"] not in ex_ids:
-                        cur_targets.append(jc)
-                        ex_ids.add(jc["id"])
-                        added_cnt += 1
-                cfg["targets"] = cur_targets
-                save_config(cfg)
-                await event.respond(f"🎉 **{added_cnt} ta yangi guruhga obuna bo'lindi va posting ro'yxatiga qo'shildi!**", buttons=get_main_keyboard())
-            else:
-                await event.respond("⚠️ Guruhlarga ulanib bo'lmadi yoki allaqachon a'zosiz.", buttons=get_main_keyboard())
+            await event.respond(report_msg, buttons=get_main_keyboard())
+
 
         elif state == "awaiting_phone":
             phone = event.text.strip().replace(" ", "").replace("-", "")
