@@ -318,10 +318,11 @@ def build_chat_toggle_keyboard(cfg, page=0):
 
 # Global dialog cache for speed
 global_acc_dialogs_cache = {}
+global_active_clients = {}
 
 # ── Main Poster Loop Task (PARALLEL - barcha akkauntlar bir vaqtda) ──
 async def auto_poster_loop(bot_client, chat_id):
-    global is_posting_active, current_msg_index, global_acc_dialogs_cache
+    global is_posting_active, current_msg_index, global_acc_dialogs_cache, global_active_clients
     round_num = 0
 
     while is_posting_active:
@@ -366,21 +367,31 @@ async def auto_poster_loop(bot_client, chat_id):
             f"⏳ Akkauntlar guruhlari tekshirilmoqda..."
         )
 
-        # 1. Fetch which dialogs each account has
+        # 1. Ensure all clients are connected
+        for s in sessions:
+            if s not in global_active_clients:
+                try:
+                    cl = TelegramClient(s, cfg["api_id"], cfg["api_hash"])
+                    await cl.connect()
+                    if not await cl.is_user_authorized():
+                        await cl.disconnect()
+                        continue
+                    global_active_clients[s] = cl
+                except Exception as e:
+                    print(f"Failed to connect {s}: {e}")
+
+        # 2. Fetch which dialogs each account has
         async def get_acc_dialogs(session_path):
             if session_path in global_acc_dialogs_cache:
                 return session_path, global_acc_dialogs_cache[session_path]
             try:
-                cl = TelegramClient(session_path, cfg["api_id"], cfg["api_hash"])
-                await cl.connect()
-                if not await cl.is_user_authorized():
-                    await cl.disconnect()
+                cl = global_active_clients.get(session_path)
+                if not cl:
                     return session_path, set()
                 d_ids = set()
                 async for d in cl.iter_dialogs():
                     if d.is_group or d.is_channel:
                         d_ids.add(d.id)
-                await cl.disconnect()
                 global_acc_dialogs_cache[session_path] = d_ids
                 return session_path, d_ids
             except Exception as e:
@@ -422,20 +433,8 @@ async def auto_poster_loop(bot_client, chat_id):
                 return sess_name, 0, 0
                 
             try:
-                cl = TelegramClient(session_path, cfg["api_id"], cfg["api_hash"])
-                connected = False
-                for _ in range(3):
-                    try:
-                        await cl.connect()
-                        connected = True
-                        break
-                    except Exception:
-                        await asyncio.sleep(1)
-                if not connected:
-                    return sess_name, 0, 0
-
-                if not await cl.is_user_authorized():
-                    await cl.disconnect()
+                cl = global_active_clients.get(session_path)
+                if not cl:
                     return sess_name, 0, 0
 
                 me = await cl.get_me()
@@ -491,6 +490,14 @@ async def auto_poster_loop(bot_client, chat_id):
             if not is_posting_active:
                 break
             await asyncio.sleep(1)
+
+    # Clean up clients when posting stops
+    for cl in global_active_clients.values():
+        try:
+            await cl.disconnect()
+        except Exception:
+            pass
+    global_active_clients.clear()
 
 
 
