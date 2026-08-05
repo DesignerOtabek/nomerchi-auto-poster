@@ -338,15 +338,15 @@ async def auto_poster_loop(bot_client, chat_id):
         dialog_results = await asyncio.gather(*[get_acc_dialogs(s) for s in sessions])
         acc_dialogs = dict(dialog_results)
 
-        # 2. Assign targets to accounts that are actually members
+        # 2. Assign targets to ALL accounts that are actually members
         acc_assigned_targets = {s: [] for s in sessions}
         unreachable = 0
         for tgt in targets:
             possible_accs = [s for s in sessions if tgt["id"] in acc_dialogs[s]]
             if possible_accs:
-                # Distribute evenly: pick the account with the minimum assigned targets so far
-                best_acc = min(possible_accs, key=lambda s: len(acc_assigned_targets[s]))
-                acc_assigned_targets[best_acc].append(tgt)
+                # Bitta guruhga a'zo bo'lgan BARCHA akkauntlarga shu guruhni beramiz (ikkalasi ham tashlaydi)
+                for acc in possible_accs:
+                    acc_assigned_targets[acc].append(tgt)
             else:
                 unreachable += 1
 
