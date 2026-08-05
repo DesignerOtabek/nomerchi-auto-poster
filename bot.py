@@ -192,8 +192,8 @@ def load_config():
             "Assalomu alaykum! Bu avtomatik e'lon xabari #1"
         ],
         "message": "Assalomu alaykum! Bu avtomatik e'lon xabari.",
-        "interval_seconds": 50,
-        "delay_between_chats": 3,
+        "interval_seconds": 10,
+        "delay_between_chats": 1,
         "all_dialogs": [],
         "targets": [],
         "multi_acc_rotation": True
@@ -336,8 +336,8 @@ async def auto_poster_loop(bot_client, chat_id):
             msgs = [cfg.get("message")]
         msgs = [m for m in msgs if m]
 
-        interval_sec = cfg.get("interval_seconds", 50)
-        delay_sec = cfg.get("delay_between_chats", 3)
+        interval_sec = cfg.get("interval_seconds", 10)
+        delay_sec = cfg.get("delay_between_chats", 1)
 
         if not targets:
             await bot_client.send_message(chat_id, "⚠️ **Diqqat:** Guruhlar ro'yxati bo'sh! Guruh qo'shishingizni kutyapman...")
@@ -855,7 +855,7 @@ async def main():
         elif state == "awaiting_interval":
             if event.text.isdigit():
                 val = int(event.text)
-                cfg["interval_seconds"] = max(5, val)
+                cfg["interval_seconds"] = max(1, val)
                 save_config(cfg)
                 user_states[user_id] = None
                 await event.respond(f"✅ **Interval har {val} sekundga o'rnatildi!**", buttons=get_main_keyboard())
