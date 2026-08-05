@@ -384,7 +384,9 @@ async def auto_poster_loop(bot_client, chat_id):
                 global_acc_dialogs_cache[session_path] = d_ids
                 return session_path, d_ids
             except Exception as e:
-                print(f"Error fetching dialogs for {session_path}: {e}")
+                err_msg = str(e)
+                sess_name = os.path.basename(session_path).replace(".session", "")
+                await bot_client.send_message(chat_id, f"⚠️ **{sess_name}** akkauntida guruhlarni yuklashda xatolik: `{err_msg}`\nIltimos, botni to'xtatib 1 daqiqa kuting yoki shu akkauntga guruhlarni qayta yuklang.")
                 return session_path, set()
 
         try:
@@ -546,7 +548,6 @@ async def main():
         if data == "toggle_posting":
             if is_posting_active:
                 is_posting_active = False
-                global_acc_dialogs_cache.clear() # Clear cache on stop
                 if posting_task:
                     posting_task.cancel()
                 await event.answer("🛑 Avto-posting to'xtatildi!", alert=True)
