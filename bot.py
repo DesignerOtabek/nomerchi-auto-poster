@@ -271,125 +271,132 @@ def build_chat_toggle_keyboard(cfg, page=0):
     buttons.append([Button.inline("⬅️ Orqaga", data="manage_chats")])
     return buttons
 
-# ── Main Poster Loop Task ────────────────────────
+# ── Main Poster Loop Task (PARALLEL - barcha akkauntlar bir vaqtda) ──
 async def auto_poster_loop(bot_client, chat_id):
     global is_posting_active, current_msg_index
     round_num = 0
-    
+
     while is_posting_active:
         round_num += 1
         cfg = load_config()
         targets = cfg.get("targets", [])
         if not targets and cfg.get("all_dialogs"):
             targets = cfg.get("all_dialogs", [])
-            cfg["targets"] = targets
-            save_config(cfg)
 
         msgs = cfg.get("messages", [])
         if not msgs and cfg.get("message"):
             msgs = [cfg.get("message")]
-            
+        msgs = [m for m in msgs if m]
+
         interval_sec = cfg.get("interval_seconds", 50)
         delay_sec = cfg.get("delay_between_chats", 3)
 
         if not targets:
-            await bot_client.send_message(chat_id, "⚠️ **Xatolik:** Hech qanday guruh/chat tanlanmagan! Avval **📋 Chatlar Boshqaruvi** bo'limidan guruhlarni qo'shing.")
+            await bot_client.send_message(chat_id, "⚠️ **Xatolik:** Guruhlar tanlanmagan! Chatlar boshqaruvidan guruh qo'shing.")
             is_posting_active = False
             break
         if not msgs:
-            await bot_client.send_message(chat_id, "⚠️ **Xatolik:** Xabar matni kiritilmagan! Avval **✍️ Xabar Matnlari** tugmasini bosing.")
+            await bot_client.send_message(chat_id, "⚠️ **Xatolik:** Xabar matni kiritilmagan!")
             is_posting_active = False
             break
 
         sessions = get_active_user_sessions()
         if not sessions:
-            await bot_client.send_message(chat_id, "⚠️ **Xatolik:** Birorta ham ulangan Telegram akkaunt yo'q! Avval **📱 Akkauntlar** bo'limidan akkaunt ulang.")
+            await bot_client.send_message(chat_id, "⚠️ **Xatolik:** Akkaunt ulangan emas!")
             is_posting_active = False
             break
 
         active_message = msgs[current_msg_index % len(msgs)]
         current_msg_index += 1
 
-        active_session = sessions[(round_num - 1) % len(sessions)]
-        sess_name = os.path.basename(active_session)
+        n_sess = len(sessions)
+        # Distribute targets evenly among accounts (round-robin)
+        chunks = [targets[i::n_sess] for i in range(n_sess)]
 
-        user_client = TelegramClient(active_session, cfg["api_id"], cfg["api_hash"])
-        try:
-            connect_ok = False
-            for att in range(5):
-                try:
-                    await user_client.connect()
-                    connect_ok = True
-                    break
-                except Exception:
-                    await asyncio.sleep(1.0)
+        now_time = datetime.now().strftime("%H:%M:%S")
+        await bot_client.send_message(
+            chat_id,
+            f"🔄 **[{now_time}] #{round_num}-Raund Boshlandi**\n"
+            f"👥 **{n_sess} ta akkaunt** parallel ishlaydi\n"
+            f"📊 Jami **{len(targets)} ta** guruhga yuboriladi"
+        )
 
-            if not connect_ok:
-                await asyncio.sleep(2)
-                continue
-
-            if not await user_client.is_user_authorized():
-                await user_client.disconnect()
-                if os.path.exists(active_session) and "auto_poster_session" in active_session:
-                    try: os.remove(active_session)
-                    except Exception: pass
-                continue
-
-            me = await user_client.get_me()
-            now_time = datetime.now().strftime("%H:%M:%S")
-
-            await bot_client.send_message(
-                chat_id, 
-                f"🔄 **[{now_time}] #{round_num}-Raund Posting Boshlandi...**\n"
-                f"👤 Akkaunt: **{me.first_name}** (`+{me.phone or 'Tel'}`)\n"
-                f"📊 Jami guruhlar: **{len(targets)} ta** | Interval: **{interval_sec}s**"
-            )
-
-            success_cnt = 0
-            fail_cnt = 0
-
-            for idx, target in enumerate(targets, 1):
-                if not is_posting_active:
-                    break
-                tgt_id = target["id"]
-                tgt_title = target["title"]
-                try:
-                    await user_client.send_message(tgt_id, active_message)
-                    success_cnt += 1
-                except FloodWaitError as e:
-                    await bot_client.send_message(chat_id, f"⏳ Telegram Cheklovi (FloodWait): {e.seconds}s kutilmoqda...")
-                    await asyncio.sleep(e.seconds)
-                    try:
-                        await user_client.send_message(tgt_id, active_message)
-                        success_cnt += 1
-                    except Exception:
-                        fail_cnt += 1
-                except Exception as ex:
-                    fail_cnt += 1
-
-                await asyncio.sleep(delay_sec)
-
-            now_end = datetime.now().strftime("%H:%M:%S")
-            await bot_client.send_message(
-                chat_id,
-                f"✅ **#{round_num}-Raund Muvaffaqiyatli Yakunlandi ({now_end})**\n\n"
-                f"🎉 Yuborildi: **{success_cnt} ta** | ❌ Xato: **{fail_cnt} ta**\n"
-                f"⏳ **Keyingi raundgacha {interval_sec} sekund tanaffus...**"
-            )
-        except Exception as ex_loop:
-            await bot_client.send_message(chat_id, f"⚠️ **Raundda xatolik ({sess_name}):** {ex_loop}")
-        finally:
+        async def session_task(session_path, my_targets):
+            sess_name = os.path.basename(session_path).replace(".session", "")
+            succ = fail = 0
             try:
-                await user_client.disconnect()
-            except Exception:
-                pass
+                cl = TelegramClient(session_path, cfg["api_id"], cfg["api_hash"])
+                connected = False
+                for _ in range(3):
+                    try:
+                        await cl.connect()
+                        connected = True
+                        break
+                    except Exception:
+                        await asyncio.sleep(1)
+                if not connected:
+                    return sess_name, 0, 0
+
+                if not await cl.is_user_authorized():
+                    await cl.disconnect()
+                    return sess_name, 0, 0
+
+                me = await cl.get_me()
+                display = me.first_name or sess_name
+
+                for tgt in my_targets:
+                    if not is_posting_active:
+                        break
+                    try:
+                        await cl.send_message(tgt["id"], active_message)
+                        succ += 1
+                    except FloodWaitError as e:
+                        wait = min(e.seconds, 60)
+                        await asyncio.sleep(wait)
+                        try:
+                            await cl.send_message(tgt["id"], active_message)
+                            succ += 1
+                        except Exception:
+                            fail += 1
+                    except Exception:
+                        fail += 1
+                    await asyncio.sleep(delay_sec)
+
+                await cl.disconnect()
+                return display, succ, fail
+            except Exception as ex:
+                return sess_name, succ, fail
+
+        # Run ALL accounts simultaneously
+        results = await asyncio.gather(
+            *[session_task(sessions[i], chunks[i]) for i in range(n_sess)],
+            return_exceptions=True
+        )
+
+        valid = [r for r in results if isinstance(r, tuple)]
+        total_succ = sum(r[1] for r in valid)
+        total_fail = sum(r[2] for r in valid)
+        now_end = datetime.now().strftime("%H:%M:%S")
+
+        acc_lines = "\n".join(
+            f"  👤 {r[0]}: ✅{r[1]} ta | ❌{r[2]} ta"
+            for r in valid
+        )
+        await bot_client.send_message(
+            chat_id,
+            f"✅ **#{round_num}-Raund Yakunlandi ({now_end})**\n\n"
+            f"📊 **Jami:** ✅ {total_succ} yuborildi | ❌ {total_fail} xato\n\n"
+            f"**Akkauntlar natijalari:**\n{acc_lines}\n\n"
+            f"⏳ Keyingi raund: **{interval_sec}s**"
+        )
 
         for _ in range(interval_sec):
             if not is_posting_active:
                 break
             await asyncio.sleep(1)
 
-# ── Main Bot Initialization ──────────────────────
+
+
 async def main():
     cfg = load_config()
     bot_token = cfg.get("bot_token", "").strip()
@@ -592,14 +599,70 @@ async def main():
         elif data == "manage_accs":
             sessions = get_active_user_sessions()
             txt = f"📱 **ULANGAN AKKAUNTLAR RO'YXATI ({len(sessions)} ta):**\n\n"
+            buttons = []
             for s in sessions:
-                txt += f"• `{os.path.basename(s)}` ✅\n"
+                name = os.path.basename(s).replace(".session", "")
+                txt += f"• `{name}` ✅\n"
+                buttons.append([Button.inline(f"🗑️ O'chirish: {name}", data=f"del_acc_{name}")])
             txt += "\n➕ Yangi akkaunt ulash uchun pastdagi tugmani bosing:"
-            buttons = [
-                [Button.inline("➕ Yangi Akkaunt Ulash (SMS)", data="add_new_acc")],
-                [Button.inline("⬅️ Orqaga", data="main_menu")]
-            ]
+            buttons.append([Button.inline("➕ Yangi Akkaunt Ulash (SMS)", data="add_new_acc")])
+            buttons.append([Button.inline("⬅️ Orqaga", data="main_menu")])
             await event.respond(txt, buttons=buttons)
+
+        elif data.startswith("del_acc_"):
+            acc_name = data.replace("del_acc_", "")
+            
+            # Remove from /tmp/sessions
+            path = os.path.join(SESSIONS_DIR, f"{acc_name}.session")
+            if os.path.exists(path):
+                try: os.remove(path)
+                except: pass
+                
+            # Remove from Render env
+            render_key = os.environ.get("RENDER_API_KEY", "")
+            service_id = os.environ.get("RENDER_SERVICE_ID", "")
+            if render_key and service_id:
+                try:
+                    import urllib.request as _ur
+                    req = _ur.Request(
+                        f"https://api.render.com/v1/services/{service_id}/env-vars",
+                        headers={"Authorization": f"Bearer {render_key}"}
+                    )
+                    resp = json.loads(_ur.urlopen(req, timeout=10).read())
+                    current = {v.get("envVar", {}).get("key", ""): v.get("envVar", {}).get("value", "") for v in resp}
+                    
+                    slot = None
+                    for i in range(1, 11):
+                        if current.get(f"SESSION_NAME_{i}", "") == f"{acc_name}.session":
+                            slot = i
+                            break
+                    if slot:
+                        current[f"SESSION_{slot}"] = ""
+                        current[f"SESSION_NAME_{slot}"] = ""
+                        payload = json.dumps([{"key": k, "value": v} for k, v in current.items() if k]).encode()
+                        req2 = _ur.Request(
+                            f"https://api.render.com/v1/services/{service_id}/env-vars",
+                            data=payload,
+                            headers={"Authorization": f"Bearer {render_key}", "Content-Type": "application/json"},
+                            method="PUT"
+                        )
+                        _ur.urlopen(req2, timeout=15)
+                except Exception as e:
+                    print(f"Del env error: {e}")
+                    
+            await event.answer(f"{acc_name} o'chirildi!", alert=True)
+            # Reload manage_accs menu
+            sessions = get_active_user_sessions()
+            txt = f"📱 **ULANGAN AKKAUNTLAR RO'YXATI ({len(sessions)} ta):**\n\n"
+            buttons = []
+            for s in sessions:
+                name = os.path.basename(s).replace(".session", "")
+                txt += f"• `{name}` ✅\n"
+                buttons.append([Button.inline(f"🗑️ O'chirish: {name}", data=f"del_acc_{name}")])
+            txt += "\n➕ Yangi akkaunt ulash uchun pastdagi tugmani bosing:"
+            buttons.append([Button.inline("➕ Yangi Akkaunt Ulash (SMS)", data="add_new_acc")])
+            buttons.append([Button.inline("⬅️ Orqaga", data="main_menu")])
+            await event.edit(txt, buttons=buttons)
 
         elif data == "add_new_acc":
             user_states[user_id] = "awaiting_phone"
